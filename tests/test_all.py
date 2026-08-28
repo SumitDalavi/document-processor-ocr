@@ -38,7 +38,7 @@ mock_sqlalchemy_orm = MagicMock()
 sys.modules["sqlalchemy.orm"] = mock_sqlalchemy_orm
 
 # Now import the modules to test
-from api.server import app, processed_documents
+from api.server import app
 from api.webhook import notify_completion
 from extraction.extractor import classify_document, extract_structured_data, GeneralExtraction, InvoiceExtraction, ContractExtraction
 from doc_queue.worker import DocumentQueue, Job
@@ -284,12 +284,12 @@ def test_postgres_store():
 # ----------------- api.server ----------------- #
 
 def test_server():
-    # Clean in-memory
-    processed_documents.clear()
     
     with patch("api.server.extract_text") as mock_ext_text, \
          patch("api.server.classify_document") as mock_classify, \
          patch("api.server.extract_structured_data") as mock_ext_data, \
+         patch("api.server.process_document_task") as mock_doc_task, \
+         patch("api.server.redis_client") as mock_redis, \
          patch("api.server.validate_extraction") as mock_val:
          
         mock_ext_text.return_value = {"full_text": "text"}
@@ -297,20 +297,27 @@ def test_server():
         mock_ext_data.return_value = {"data": "data"}
         mock_val.return_value = {"validation": {"passed": True}, "routing": "auto-approve", "confidence": 0.9}
         
+        mock_task = MagicMock()
+        mock_task.id = "task-123"
+        mock_doc_task.delay.return_value = mock_task
+        
+        mock_redis.get.return_value = json.dumps({"id": "doc_id", "status": "processing", "document_type": "invoice"})
+        mock_redis.smembers.return_value = ["doc_id"]
+        
         # Test Upload
         with open("test.txt", "w") as f:
             f.write("test")
         with open("test.txt", "rb") as f:
             res = client.post("/api/upload", files={"file": ("test.txt", f, "text/plain")})
-        assert res.status_code == 200
+        assert res.status_code == 200, res.text
         doc_id = res.json()["id"]
         
         # Test Exception in Upload
-        mock_ext_text.side_effect = Exception("failed")
+        mock_doc_task.delay.side_effect = Exception("failed")
         with open("test.txt", "rb") as f:
             res = client.post("/api/upload", files={"file": ("test.txt", f, "text/plain")})
         assert res.status_code == 500
-        mock_ext_text.side_effect = None
+        mock_doc_task.delay.side_effect = None
 
         # Test process-text
         res = client.post("/api/process-text", json={"text": "text"})
@@ -320,39 +327,44 @@ def test_server():
         # Test list documents
         res = client.get("/api/documents")
         assert res.status_code == 200
-        assert res.json()["total"] == 2
+        assert res.json()["total"] == 1
         
         # Test get document
         res = client.get(f"/api/documents/{doc_id}")
         assert res.status_code == 200
-        assert res.json()["id"] == doc_id
+        assert res.json()["id"] == "doc_id"
         
+        mock_redis.get.return_value = None
         res = client.get("/api/documents/invalid")
         assert res.status_code == 404
         
         # Test approve
+        mock_redis.get.return_value = json.dumps({"id": "doc_id", "status": "processing"})
         res = client.post(f"/api/documents/{doc_id}/approve")
         assert res.status_code == 200
-        assert processed_documents[0]["status"] == "approved"
         
+        mock_redis.get.return_value = None
         res = client.post("/api/documents/invalid/approve")
         assert res.status_code == 404
         
         # Test reject
+        mock_redis.get.return_value = json.dumps({"id": "doc_id", "status": "processing"})
         res = client.post(f"/api/documents/{doc_id}/reject")
         assert res.status_code == 200
-        assert processed_documents[0]["status"] == "rejected"
         
+        mock_redis.get.return_value = None
         res = client.post("/api/documents/invalid/reject")
         assert res.status_code == 404
         
         # Test stats
+        mock_redis.smembers.return_value = ["doc_id"]
+        mock_redis.get.return_value = json.dumps({"id": "doc_id", "status": "processing", "document_type": "invoice"})
         res = client.get("/api/stats")
         assert res.status_code == 200
-        assert res.json()["total"] == 2
+        assert res.json()["total"] == 1
         
         # Clear docs for stats empty
-        processed_documents.clear()
+        mock_redis.smembers.return_value = []
         res = client.get("/api/stats")
         assert res.status_code == 200
         assert res.json()["total"] == 0

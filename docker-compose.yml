@@ -6,3 +6,22 @@ services:
       - "4006:4006"
     volumes:
       - ./uploads:/app/uploads
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  worker:
+    build: .
+    command: celery -A doc_queue.celery_app worker --loglevel=info
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

@@ -19,8 +19,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from data.ingestion import extract_text
 from extraction.extractor import extract_structured_data, classify_document
 from validation.validator import validate_extraction
+from doc_queue.tasks import process_document_task
+from celery.result import AsyncResult
+import redis
+import json
 
 load_dotenv()
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 app = FastAPI(title="Multi-Modal Document Processor")
 
@@ -34,8 +41,8 @@ app.add_middleware(
 UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# In-memory store for processed documents
-processed_documents: list[dict] = []
+UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 
 class ProcessRequest(BaseModel):
@@ -61,33 +68,24 @@ async def upload_and_process(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, f)
     
     try:
-        # Step 1: Extract text
-        text_result = extract_text(str(save_path))
+        # Submit to Celery
+        task = process_document_task.delay(str(save_path), file.filename)
         
-        # Step 2: Classify document
-        doc_type = classify_document(text_result["full_text"])
-        
-        # Step 3: Extract structured data
-        extraction = extract_structured_data(text_result["full_text"], doc_type)
-        
-        # Step 4: Validate
-        validation = validate_extraction(extraction)
-        
-        # Store result
+        # Initial status
         result = {
             "id": doc_id,
+            "task_id": task.id,
             "filename": file.filename,
-            "text_extraction": text_result,
-            "document_type": doc_type,
-            "structured_data": extraction,
-            "validation": validation,
-            "status": validation["routing"]
+            "status": "processing"
         }
-        processed_documents.append(result)
+        redis_client.set(f"doc:{doc_id}", json.dumps(result))
+        redis_client.sadd("documents", doc_id)
         
         return result
     
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -108,7 +106,8 @@ async def process_text(req: ProcessRequest):
         "validation": validation,
         "status": validation["routing"]
     }
-    processed_documents.append(result)
+    redis_client.set(f"doc:{doc_id}", json.dumps(result))
+    redis_client.sadd("documents", doc_id)
     
     return result
 
@@ -116,52 +115,96 @@ async def process_text(req: ProcessRequest):
 @app.get("/api/documents")
 async def list_documents():
     """List all processed documents."""
-    return {
-        "documents": [{
-            "id": d["id"],
-            "filename": d["filename"],
-            "document_type": d["document_type"],
-            "status": d["status"],
-            "validation_passed": d["validation"]["validation"]["passed"],
-            "confidence": d["validation"]["confidence"]
-        } for d in processed_documents],
-        "total": len(processed_documents)
-    }
+    doc_ids = redis_client.smembers("documents")
+    docs = []
+    for d_id in doc_ids:
+        raw = redis_client.get(f"doc:{d_id}")
+        if raw:
+            d = json.loads(raw)
+            # Sync celery task state if still processing
+            if d.get("status") == "processing" and "task_id" in d:
+                task = AsyncResult(d["task_id"])
+                if task.ready():
+                    if task.successful():
+                        task_res = task.result
+                        if "error" in task_res:
+                            d["status"] = "failed"
+                        else:
+                            d.update(task_res)
+                    else:
+                        d["status"] = "failed"
+                    redis_client.set(f"doc:{d_id}", json.dumps(d))
 
+            docs.append({
+                "id": d.get("id"),
+                "filename": d.get("filename"),
+                "document_type": d.get("document_type"),
+                "status": d.get("status"),
+                "validation_passed": d.get("validation", {}).get("validation", {}).get("passed") if "validation" in d else None,
+                "confidence": d.get("validation", {}).get("confidence") if "validation" in d else None,
+            })
+    return {
+        "documents": docs,
+        "total": len(docs)
+    }
 
 @app.get("/api/documents/{doc_id}")
 async def get_document(doc_id: str):
     """Get full details for a specific document."""
-    doc = next((d for d in processed_documents if d["id"] == doc_id), None)
-    if not doc:
+    raw = redis_client.get(f"doc:{doc_id}")
+    if not raw:
         raise HTTPException(status_code=404, detail="Document not found")
-    return doc
+    d = json.loads(raw)
+    
+    if d.get("status") == "processing" and "task_id" in d:
+        task = AsyncResult(d["task_id"])
+        if task.ready():
+            if task.successful():
+                task_res = task.result
+                if "error" in task_res:
+                    d["status"] = "failed"
+                else:
+                    d.update(task_res)
+            else:
+                d["status"] = "failed"
+            redis_client.set(f"doc:{doc_id}", json.dumps(d))
+    return d
 
 
 @app.post("/api/documents/{doc_id}/approve")
 async def approve_document(doc_id: str):
     """Human reviewer approves a document."""
-    doc = next((d for d in processed_documents if d["id"] == doc_id), None)
-    if not doc:
+    raw = redis_client.get(f"doc:{doc_id}")
+    if not raw:
         raise HTTPException(status_code=404, detail="Document not found")
+    doc = json.loads(raw)
     doc["status"] = "approved"
+    redis_client.set(f"doc:{doc_id}", json.dumps(doc))
     return {"success": True}
-
 
 @app.post("/api/documents/{doc_id}/reject")
 async def reject_document(doc_id: str):
     """Human reviewer rejects a document."""
-    doc = next((d for d in processed_documents if d["id"] == doc_id), None)
-    if not doc:
+    raw = redis_client.get(f"doc:{doc_id}")
+    if not raw:
         raise HTTPException(status_code=404, detail="Document not found")
+    doc = json.loads(raw)
     doc["status"] = "rejected"
+    redis_client.set(f"doc:{doc_id}", json.dumps(doc))
     return {"success": True}
 
 
 @app.get("/api/stats")
 async def get_stats():
     """Processing pipeline analytics."""
-    total = len(processed_documents)
+    doc_ids = redis_client.smembers("documents")
+    docs = []
+    for d_id in doc_ids:
+        raw = redis_client.get(f"doc:{d_id}")
+        if raw:
+            docs.append(json.loads(raw))
+            
+    total = len(docs)
     if total == 0:
         return {"total": 0}
     
@@ -169,14 +212,14 @@ async def get_stats():
     by_status = {}
     by_routing = {}
     
-    for d in processed_documents:
-        dt = d["document_type"]
+    for d in docs:
+        dt = d.get("document_type", "unknown")
         by_type[dt] = by_type.get(dt, 0) + 1
         
-        status = d["status"]
+        status = d.get("status", "unknown")
         by_status[status] = by_status.get(status, 0) + 1
         
-        routing = d["validation"]["routing"]
+        routing = d.get("validation", {}).get("routing", "unknown") if "validation" in d else "unknown"
         by_routing[routing] = by_routing.get(routing, 0) + 1
     
     auto_approved = by_routing.get("auto-approve", 0)
