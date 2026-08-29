@@ -1,6 +1,9 @@
+> **NOTE:** This repository is an archival lab or partial prototype. It is not actively maintained and should not be used as a reference for production-grade deployments or performance benchmarks.
+
+
 # document-processor-ocr
 
-> **Maturity:** Partial Prototype
+> **Maturity:** Functional Prototype
 > _Scalable OCR document processing service that extracts text and layout information from PDFs and images._
 
 ## Features
