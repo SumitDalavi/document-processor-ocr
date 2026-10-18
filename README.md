@@ -3,6 +3,10 @@
 
 # document-processor-ocr
 
+[![CI Pipeline](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/SumitDalavi/document-processor-ocr)](https://github.com/SumitDalavi/document-processor-ocr/releases)
+[![Release Workflow](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/release.yml/badge.svg)](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/release.yml)
+
 > **Maturity:** Functional Prototype
 > _Scalable OCR document processing service that extracts text and layout information from PDFs and images._
 
@@ -41,6 +45,20 @@ Please see the [Architecture Document](docs/architecture.md) for sequence diagra
 | API & Queue | **Real** | FastAPI + Celery + Redis for asynchronous processing. |
 | Infrastructure | **Real** | Postgres for metadata, MinIO for object storage. |
 | OCR Engine | **Mocked** | Tesseract/Vision API is simulated using a local text fixture to speed up testing. |
+
+## 🔒 Release & Security Verification
+
+Every tagged release (*.*.*) triggers an automated DevSecOps release workflow:
+1. **Automated Testing:** Runs pytest test suite with pytest-asyncio and httpx.
+2. **Container Image Build:** Builds the service container image (ghcr.io/sumitdalavi/document-processor-ocr:<tag>).
+3. **Vulnerability Scanning:** Scans the container image using [Aqua Security Trivy](https://github.com/aquasecurity/trivy-action) for HIGH and CRITICAL CVEs.
+4. **SBOM Generation:** Generates a Software Bill of Materials (SBOM) in SPDX JSON format (sbom.spdx.json) using [Anchore Syft](https://github.com/anchore/sbom-action).
+5. **GitHub Release Publishing:** Packages release notes and attaches sbom.spdx.json as a verifiable supply-chain asset.
+
+## 👨‍💻 Author
+
+**Sumit Dalavi** — Senior DevSecOps / Platform Engineer  
+[GitHub](https://github.com/SumitDalavi) | [LinkedIn](https://in.linkedin.com/in/sumit-dalavi-762838129)
 
 ## 📚 Documentation
 
