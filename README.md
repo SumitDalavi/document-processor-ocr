@@ -1,11 +1,14 @@
 > **NOTE:** This repository is an archival lab or partial prototype. It is not actively maintained and should not be used as a reference for production-grade deployments or performance benchmarks.
 
-
 # document-processor-ocr
 
 [![CI Pipeline](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/SumitDalavi/document-processor-ocr)](https://github.com/SumitDalavi/document-processor-ocr/releases)
+[![Release](https://img.shields.io/github/v/release/SumitDalavi/document-processor-ocr?color=0969da&label=release&logo=github)](https://github.com/SumitDalavi/document-processor-ocr/releases)
 [![Release Workflow](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/release.yml/badge.svg)](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/release.yml)
+[![GHCR Container](https://img.shields.io/badge/ghcr.io-v0.2.0-blue?logo=docker&logoColor=white)](https://github.com/SumitDalavi/document-processor-ocr/pkgs/container/document-processor-ocr)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org)
+[![SBOM](https://img.shields.io/badge/SBOM-SPDX%202.3-blueviolet?logo=spdx)](https://github.com/SumitDalavi/document-processor-ocr/releases/tag/v0.2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 > **Maturity:** Functional Prototype
 > _Scalable OCR document processing service that extracts text and layout information from PDFs and images._
@@ -30,13 +33,11 @@ pytest
 ## Architecture
 Please see the [Architecture Document](docs/architecture.md) for sequence diagrams and system design details.
 
-
 ## CI & Reliability Updates (August 2026)
 
 - **CI Pipeline Remediation:** Successfully resolved all CI/CD pipeline failures and established baseline CI workflows.
 - **Specific Fix:** Added and configured robust GitHub Actions workflows for automated testing, linting, and formatting.
 - **Status:** 🟩 Passing
-
 
 ## Mock Boundaries (Honest Scope)
 
@@ -48,7 +49,8 @@ Please see the [Architecture Document](docs/architecture.md) for sequence diagra
 
 ## 🔒 Release & Security Verification
 
-Every tagged release (*.*.*) triggers an automated DevSecOps release workflow:
+Every tagged release (
+*.*.*) triggers an automated DevSecOps release workflow:
 1. **Automated Testing:** Runs pytest test suite with pytest-asyncio and httpx.
 2. **Container Image Build:** Builds the service container image (ghcr.io/sumitdalavi/document-processor-ocr:<tag>).
 3. **Vulnerability Scanning:** Scans the container image using [Aqua Security Trivy](https://github.com/aquasecurity/trivy-action) for HIGH and CRITICAL CVEs.
