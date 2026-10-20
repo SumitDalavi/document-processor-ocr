@@ -1,5 +1,3 @@
-> **NOTE:** This repository is an archival lab or partial prototype. It is not actively maintained and should not be used as a reference for production-grade deployments or performance benchmarks.
-
 # document-processor-ocr
 
 [![CI Pipeline](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SumitDalavi/document-processor-ocr/actions/workflows/ci.yml)
@@ -33,12 +31,6 @@ pytest
 ## Architecture
 Please see the [Architecture Document](docs/architecture.md) for sequence diagrams and system design details.
 
-## CI & Reliability Updates (August 2026)
-
-- **CI Pipeline Remediation:** Successfully resolved all CI/CD pipeline failures and established baseline CI workflows.
-- **Specific Fix:** Added and configured robust GitHub Actions workflows for automated testing, linting, and formatting.
-- **Status:** 🟩 Passing
-
 ## Mock Boundaries (Honest Scope)
 
 | What | Status | Details |
@@ -46,16 +38,6 @@ Please see the [Architecture Document](docs/architecture.md) for sequence diagra
 | API & Queue | **Real** | FastAPI + Celery + Redis for asynchronous processing. |
 | Infrastructure | **Real** | Postgres for metadata, MinIO for object storage. |
 | OCR Engine | **Mocked** | Tesseract/Vision API is simulated using a local text fixture to speed up testing. |
-
-## 🔒 Release & Security Verification
-
-Every tagged release (
-*.*.*) triggers an automated DevSecOps release workflow:
-1. **Automated Testing:** Runs pytest test suite with pytest-asyncio and httpx.
-2. **Container Image Build:** Builds the service container image (ghcr.io/sumitdalavi/document-processor-ocr:<tag>).
-3. **Vulnerability Scanning:** Scans the container image using [Aqua Security Trivy](https://github.com/aquasecurity/trivy-action) for HIGH and CRITICAL CVEs.
-4. **SBOM Generation:** Generates a Software Bill of Materials (SBOM) in SPDX JSON format (sbom.spdx.json) using [Anchore Syft](https://github.com/anchore/sbom-action).
-5. **GitHub Release Publishing:** Packages release notes and attaches sbom.spdx.json as a verifiable supply-chain asset.
 
 ## 👨‍💻 Author
 
@@ -106,16 +88,10 @@ Every tagged release (`v*.*.*`) triggers an automated DevSecOps release workflow
 ### Verifying Releases via GitHub CLI
 ```bash
 # View release details
-gh release view v0.1.0 --repo SumitDalavi/document-processor-ocr
+gh release view v0.2.0 --repo SumitDalavi/document-processor-ocr
 
 # Download and verify SBOM
-gh release download v0.1.0 --repo SumitDalavi/document-processor-ocr --pattern "sbom.spdx.json"
+gh release download v0.2.0 --repo SumitDalavi/document-processor-ocr --pattern "sbom.spdx.json"
 cat sbom.spdx.json | jq .
 ```
 
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Runbook](docs/runbook.md)
-- [Decisions](docs/decisions.md)
-- [Changelog](docs/changelog.md)
