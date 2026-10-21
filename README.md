@@ -8,8 +8,7 @@
 [![SBOM](https://img.shields.io/badge/SBOM-SPDX%202.3-blueviolet?logo=spdx)](https://github.com/SumitDalavi/document-processor-ocr/releases/tag/v0.2.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-> **Maturity:** Functional Prototype
-> _Scalable OCR document processing service that extracts text and layout information from PDFs and images._
+> Scalable OCR document processing service that extracts structured text and layout information from PDFs and images.
 
 ## Features
 - Fully automated workflow.
